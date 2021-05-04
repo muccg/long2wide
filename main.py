@@ -14,6 +14,7 @@ from PIL.ImageTk import PhotoImage
 IMPLEMENTED = [
     ('Bruker', 'Amino Acids'),
     ('Waters', 'Tryptophan'),
+    ('Waters', 'Bile Acids'),
 ]
 
 class CustomDialog:
@@ -180,8 +181,8 @@ class Application(tk.Frame):
             df = janitor.clean_names(df, remove_special=True, case_type='snake')
             try:
                 df = df[BRUKER_VARIABLES]
-            except Exception:
-                return 'wrong parameters'
+            except Exception as e:
+                return 'wrong parameters', str(e)
             df['quantity_units'] = pd.to_numeric(df['quantity_units'], errors='coerce')
             df_area = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='area_of_pi')  # , aggfunc=np.mean)
             df_quantity = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='quantity_units')  # , aggfunc=np.mean)
@@ -198,7 +199,8 @@ class Application(tk.Frame):
 
     def process_waters(self, df):
         analysis_type = self.analysis_type.get()
-        if analysis_type =='Tryptophan':
+        if analysis_type =='Tryptophan' or \
+                analysis_type =='Bile Acids':
             try:
                 headers = df.loc[5].values.flatten().tolist()  # get the 5th row as headers
                 headers[0] = 'analyte_name'
@@ -227,8 +229,8 @@ class Application(tk.Frame):
                 df_quantity = self.extra_process_waters(df_quantity)
 
                 return df_area, df_quantity, df_rt
-            except Exception:
-                return 'wrong parameters'
+            except Exception as e:
+                return 'wrong parameters', str(e)
 
     def get_file_type(self):
         file_type = 'TXT'
@@ -278,12 +280,12 @@ class Application(tk.Frame):
                     df = data_file.read(file, file_type)
                     if machine_type == 'Bruker':
                         result = self.process_bruker(df)
-                        if result == 'wrong parameters':
+                        if isinstance(result[0], str) and result[0] == 'wrong parameters':
                             return result
                         df_area, df_quantity, df_rt = result[0], result[1], result[2]
                     else:
                         result = self.process_waters(df)
-                        if result == 'wrong parameters':
+                        if isinstance(result[0], str) and result[0] == 'wrong parameters':
                             return result
                         df_area, df_quantity, df_rt = result[0], result[1], result[2]
 
@@ -327,11 +329,12 @@ class Application(tk.Frame):
             message2 = f"\n{self.config['cwd']}\nPlease select correct options"
             self.status_message.configure(text=message1, fg="#ff0000", bg="#ddd")
             self.show_messagebox(message1 + message2, message_type="error")
-        elif result == 'wrong parameters':
+        elif isinstance(result[0], str) and result[0] == 'wrong parameters':
             message1 = f"Please check your selections / file structure."
             message2 = f"\nLook for missing columns, if you have modified the exported file."
+            message3 = f"\n\nOr a missing molecular mass value in the FlipPy software.\n{ result[1] }"
             self.status_message.configure(text=message1, fg="#ff0000", bg="#ddd")
-            self.show_messagebox(message1 + message2, message_type="error")
+            self.show_messagebox(message1 + message2 + message3, message_type="error")
 
     def select_cwd(self):
         old = self.config["cwd"]
