@@ -45,9 +45,6 @@ class CustomDialog:
     def success(self, message, title="Success"):
         self.dialog.wm_title(title)
         self.dialog.title(title)
-        # im_temp = Image.open("success.png")
-        # im_temp = im_temp.resize((35, 35), Image.ANTIALIAS)
-        # im_temp.save("success_icon.png", "png")
         my_image = tk.PhotoImage(file="success_icon.png")
         self.dialog_image.configure(image=my_image, bg="#eeffdd")
         self.dialog_image.photo = my_image
@@ -59,10 +56,30 @@ class CustomDialog:
         self.dialog.deiconify()
 
 
+class InputDialog:
+    def __init__(self, master):
+        self.dialog = tk.Toplevel(master)
+        self.dialog_label = tk.Label(self.dialog, text="Enter mass ")
+        self.dialog_label.pack(padx=(10, 15), pady=15, side=tk.TOP)
+        self.input_box = tk.Entry(self.dialog)
+        self.input_box.pack(padx=5, pady=5, side=tk.TOP)
+        self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.dialog.withdraw())
+        self.dialog_button.pack(padx=5, pady=5, side=tk.TOP)
+        self.dialog.wm_protocol("WM_DELETE_WINDOW", lambda: master.on_delete_child(self.dialog))
+
+    def _set_label(self, message):
+        self.dialog_label.configure(text=f"\n{message}\n")
+
+    def bring_to_top(self):
+        self.dialog.attributes('-topmost', 'true')
+        self.dialog.deiconify()
+
+
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.menubar = None
+        self.input_box = None
         self.optionsbar = None
         self.selections_machine_text = None
         self.selections_folder_text = None
@@ -516,7 +533,13 @@ class Application(tk.Frame):
         self.show_help()
 
     def show_compounds(self):
-        pass
+        if self.input_box:
+            try:
+                self.input_box.bring_to_top()
+            except Exception:
+                self.input_box = None
+        if not self.input_box:
+            self.input_box = InputDialog(self)
 
     def show_help(self):
         if not self.config_window:
