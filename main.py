@@ -17,13 +17,14 @@ IMPLEMENTED = [
     ('Waters', 'Bile Acids'),
 ]
 
+
 class CustomDialog:
     def __init__(self, master):
         self.dialog = tk.Toplevel(master)
         self.dialog_image = tk.Label(self.dialog)
-        self.dialog_image.pack(padx=(10,10), pady=2, side=tk.LEFT)
+        self.dialog_image.pack(padx=(10, 10), pady=2, side=tk.LEFT)
         self.dialog_label = tk.Label(self.dialog, text="Grrr! Something's wrong.")
-        self.dialog_label.pack(padx=(10,15), pady=15, side=tk.LEFT)
+        self.dialog_label.pack(padx=(10, 15), pady=15, side=tk.LEFT)
         self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.dialog.withdraw())
         self.dialog_button.pack(padx=5, pady=5, side=tk.BOTTOM)
         self.dialog.wm_protocol("WM_DELETE_WINDOW", lambda: master.on_delete_child(self.dialog))
@@ -34,21 +35,21 @@ class CustomDialog:
     def error(self, message, title="Error"):
         self.dialog.wm_title(title)
         self.dialog.title(title)
-        img = tk.PhotoImage(file="error_icon.png")
-        self.dialog_image.configure(image=img, bg="#ffe8f5")
-        self.dialog_image.photo = img
+        my_image = tk.PhotoImage(file="error_icon.png")
+        self.dialog_image.configure(image=my_image, bg="#ffe8f5")
+        self.dialog_image.photo = my_image
         self._set_label(message, '#ffe8f5')
         self.dialog.configure(bg="#ffe8f5")
 
     def success(self, message, title="Success"):
         self.dialog.wm_title(title)
         self.dialog.title(title)
-        #im_temp = Image.open("success.png")
-        #im_temp = im_temp.resize((35, 35), Image.ANTIALIAS)
-        #im_temp.save("success_icon.png", "png")
-        img = tk.PhotoImage(file="success_icon.png")
-        self.dialog_image.configure(image=img, bg="#eeffdd")
-        self.dialog_image.photo = img
+        # im_temp = Image.open("success.png")
+        # im_temp = im_temp.resize((35, 35), Image.ANTIALIAS)
+        # im_temp.save("success_icon.png", "png")
+        my_image = tk.PhotoImage(file="success_icon.png")
+        self.dialog_image.configure(image=my_image, bg="#eeffdd")
+        self.dialog_image.photo = my_image
         self._set_label(message, '#eeffdd')
         self.dialog.configure(bg="#eeffdd")
 
@@ -60,6 +61,14 @@ class CustomDialog:
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
+        self.menubar = None
+        self.optionsbar = None
+        self.selections_machine_text = None
+        self.selections_folder_text = None
+        self.selections_file_text = None
+        self.selections_analysis_text = None
+        self.status_message = None
+        self.process_button = None
         self.selected_cwd = False
         self.pack(fill='both', padx=2, pady=2)
         self.master.title('ANPC - Flip L2W')
@@ -70,6 +79,13 @@ class Application(tk.Frame):
         self.df = pd.DataFrame()
         self.config_window = False
         self.messagebox = None
+        self.mol_weights = self.load_mol_weights()
+        self.cwd_lf = None
+        self.dir_lf = None
+        self.change_color()
+
+    def load_mol_weights(self):
+        return "test"
 
     def load_config(self):
         self.config = get_config()
@@ -184,9 +200,10 @@ class Application(tk.Frame):
             except Exception as e:
                 return 'wrong parameters', str(e)
             df['quantity_units'] = pd.to_numeric(df['quantity_units'], errors='coerce')
-            df_area = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='area_of_pi')  # , aggfunc=np.mean)
-            df_quantity = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='quantity_units')  # , aggfunc=np.mean)
-            df_rt = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='rt_min')  # , aggfunc=np.mean)
+            df_area = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='area_of_pi')
+            df_quantity = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name',
+                                         values='quantity_units')
+            df_rt = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='rt_min')
             df_quantity = self.extra_process_bruker(df_quantity)
             return df_area, df_quantity, df_rt
 
@@ -199,8 +216,8 @@ class Application(tk.Frame):
 
     def process_waters(self, df):
         analysis_type = self.analysis_type.get()
-        if analysis_type =='Tryptophan' or \
-                analysis_type =='Bile Acids':
+        if analysis_type == 'Tryptophan' or \
+                analysis_type == 'Bile Acids':
             try:
                 headers = df.loc[5].values.flatten().tolist()  # get the 5th row as headers
                 headers[0] = 'analyte_name'
@@ -222,9 +239,9 @@ class Application(tk.Frame):
                 df["rt"] = pd.to_numeric(df["rt"], errors='coerce')
 
                 # ---------Note: for any new columns update WATERS_VARIABLES and use it below------
-                df_area = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='area')  # , fill_value=0)  # , aggfunc=np.mean)
-                df_quantity = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='conc')  # , fill_value=0)  # , aggfunc=np.mean)
-                df_rt = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='rt')  # , fill_value=0)  # , aggfunc=np.mean)
+                df_area = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='area')
+                df_quantity = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='conc')
+                df_rt = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='rt')
 
                 df_quantity = self.extra_process_waters(df_quantity)
 
@@ -357,7 +374,9 @@ class Application(tk.Frame):
         self.set_selections_text()
 
     def change_color(self):
-        current_fg = self.dir_lf.cget("foreground")
+        current_fg = "red"
+        if self.dir_lf:
+            current_fg = self.dir_lf.cget("foreground")
         other = "#aaa"
         if not self.selected_cwd and current_fg in ["red", other]:
             next_fg = other if current_fg == "red" else "red"
@@ -407,12 +426,14 @@ class Application(tk.Frame):
 
     def add_help(self):
         help_lf = tk.LabelFrame(self.cwd_lf, text="", padx=2, pady=2, relief=tk.FLAT, bg="#ccc")
-        help_lf.pack(side=tk.TOP, padx=1, pady=(1,10))
+        help_lf.pack(side=tk.TOP, padx=1, pady=(1, 10))
 
-        help_text = f"Please copy your files to an empty folder and select that folder (Each file will be processed separately)\n\n"
+        help_text = f"Please copy your files to an empty folder and select that folder " + \
+                    f"(Each file will be processed separately)\n\n"
         help_text += f"Files should have the columns:\n"
         help_text += f"Bruker (xlsx): {BRUKER_VARIABLES}\n"
-        help_text += f"Waters (TXT) : {WATERS_HELP_VARIABLES} (analyte names appear on separate lines, eg. Compound: tryptophan){' '*32}"
+        help_text += f"Waters (TXT) : {WATERS_HELP_VARIABLES} (analyte names appear on " + \
+                     f"separate lines, eg. Compound: tryptophan){' '*32}"
 
         help_message = tk.Label(help_lf, bg="#ccc", fg="#222", font=("Arial", 10), justify=tk.LEFT, text=help_text)
         help_message.pack(side=tk.TOP, padx=10, pady=0)
@@ -449,7 +470,8 @@ class Application(tk.Frame):
         ]
         analysis_types = self.bruker_analysis_types + self.waters_analysis_types + self.sciex_analysis_types
         for name in analysis_types:
-            wat_rb = tk.Radiobutton(self.analysis_lf, text=name, variable=self.analysis_type, bd=0, command=self.set_selections_text,
+            tk.Radiobutton(self.analysis_lf, text=name, variable=self.analysis_type, bd=0,
+                           command=self.set_selections_text,
                            activebackground='palegreen', state=tk.DISABLED,
                            value=name, relief=tk.SOLID).pack(anchor=tk.W, padx=2, pady=2)
 
@@ -457,16 +479,17 @@ class Application(tk.Frame):
         self.double_conc_lf = tk.LabelFrame(self.cwd_lf, text=" ", padx=2, pady=2, relief=tk.FLAT, bg="#ccc")
         self.double_conc_lf.pack(side=tk.LEFT, padx=8, pady=2)
         self.double_conc = tk.IntVar(value=1)
-        tk.Checkbutton(self.double_conc_lf, text="Double Qty.", state=tk.DISABLED, variable=self.double_conc, bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
+        tk.Checkbutton(self.double_conc_lf, text="Double Qty.", state=tk.DISABLED, variable=self.double_conc,
+                       bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
 
     def _add_unit_conc_selector(self):
         self.unit_conc_lf = tk.LabelFrame(self.cwd_lf, text=" ", padx=2, pady=2, relief=tk.FLAT, bg="#ccc")
         self.unit_conc_lf.pack(side=tk.LEFT, padx=8, pady=2)
         self.unit_conc = tk.IntVar(value=1)
-        tk.Checkbutton(self.unit_conc_lf, text="Conc. Unit (ng/mL to uM)", state=tk.DISABLED, variable=self.unit_conc, bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
+        tk.Checkbutton(self.unit_conc_lf, text="Conc. Unit (ng/mL to uM)", state=tk.DISABLED, variable=self.unit_conc,
+                       bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
 
     def add_controls(self):
-        cwd = self.config["cwd"]
         self.dir_lf = tk.LabelFrame(self.cwd_lf, text='Select', padx=2, pady=2, relief=tk.FLAT, bg="#ccc", fg="red")
         self.dir_lf.pack(side=tk.LEFT, padx=8, pady=2)
         cwd_button = tk.Button(self.dir_lf, text="Folder", command=self.select_cwd, activebackground='palegreen')
@@ -485,8 +508,11 @@ class Application(tk.Frame):
         w.destroy()
         self.config_window = None
 
-    def help(self, event):
+    def help(self, _):
         self.show_help()
+
+    def show_compounds(self):
+        pass
 
     def show_help(self):
         if not self.config_window:
@@ -503,10 +529,12 @@ class Application(tk.Frame):
 
             help_text = f"\nFiles should have these columns:\n\n"
             help_text += f"Bruker (xlsx): {BRUKER_VARIABLES}\n"
-            help_text += f"Waters (TXT) : {WATERS_HELP_VARIABLES} (analyte names appear on separate lines, eg. Compound: tryptophan)\n"
+            help_text += f"Waters (TXT) : {WATERS_HELP_VARIABLES} " + \
+                         f"(analyte names appear on separate lines, eg. Compound: tryptophan)\n"
             tk.Label(self.config_window, text=help_text, bg="#ddd", font=("Arial", 10), justify="left").pack()
 
-            tk.Label(self.config_window, text="Molecular weights:", bg="#ddd", font=("Arial", 12), anchor="w").pack(fill=tk.X)
+            tk.Label(self.config_window, text="Molecular weights:",
+                     bg="#ddd", font=("Arial", 12), anchor="w").pack(fill=tk.X)
 
             ctext = scrolledtext.ScrolledText(self.config_window, height=20, font=('Courier', 10))
             ctext.pack(padx=3, pady=3, fill=tk.BOTH)
@@ -516,7 +544,7 @@ class Application(tk.Frame):
         else:
             tk.raise_above_all(self.config_window)
 
-    def close(self, event):
+    def close(self, _):
         self.exit()
 
     def add_options_bar(self):
@@ -542,10 +570,11 @@ class Application(tk.Frame):
         filemenu.add_command(label=f"Exit            Esc", command=self.exit, activebackground="palegreen")
         self.menubar.add_cascade(label="File", menu=filemenu)
 
+        self.menubar.add_command(label="Compounds", command=self.show_compounds, activebackground="#def5d6")
+
         self.add_options_bar()
         self.status_message.configure(text=f"Last used folder: {self.config['cwd']}", fg="#666")
 
-        self.change_color()
         self.master.bind('<Escape>', self.close)
         self.master.bind('<F1>', self.help)
         self.select_cwd()
