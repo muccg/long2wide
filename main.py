@@ -6,7 +6,6 @@ import tkinter as tk
 from datetime import datetime
 from pandas import ExcelWriter
 from tkinter import scrolledtext
-from mol_weights import *
 from utils import *
 from models import DataFile
 from PIL.ImageTk import PhotoImage
@@ -16,6 +15,8 @@ IMPLEMENTED = [
     ('Waters', 'Tryptophan'),
     ('Waters', 'Bile Acids'),
 ]
+
+COMPOUNDS_FILE = "compounds.json"
 
 
 class CustomDialog:
@@ -79,13 +80,16 @@ class Application(tk.Frame):
         self.df = pd.DataFrame()
         self.config_window = False
         self.messagebox = None
-        self.mol_weights = self.load_mol_weights()
+        self.mol_weights = self.load_compounds()
         self.cwd_lf = None
         self.dir_lf = None
         self.change_color()
 
-    def load_mol_weights(self):
-        return "test"
+    def load_compounds(self):
+        if os.path.isfile(COMPOUNDS_FILE):
+            with open(COMPOUNDS_FILE) as f:
+                compounds = json.load(f)
+        return compounds
 
     def load_config(self):
         self.config = get_config()
@@ -210,7 +214,7 @@ class Application(tk.Frame):
     def extra_process_waters(self, df_quantity):
         if self.unit_conc.get():
             for col in df_quantity.columns.to_list():
-                mol_weight = mol_weights[col.lower()]
+                mol_weight = self.mol_weights[col.lower()]
                 df_quantity[col] = df_quantity[col].apply(unit_conc, args=(mol_weight,))
         return df_quantity
 
@@ -538,7 +542,7 @@ class Application(tk.Frame):
 
             ctext = scrolledtext.ScrolledText(self.config_window, height=20, font=('Courier', 10))
             ctext.pack(padx=3, pady=3, fill=tk.BOTH)
-            mol_list = [f"{k: <50}- {mol_weights[k]}\n" for k in mol_weights.keys()]
+            mol_list = [f"{k: <50}- {self.mol_weights[k]}\n" for k in self.mol_weights.keys()]
             help_text = "".join(mol_list)
             ctext.insert("end", help_text)
         else:
