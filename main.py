@@ -57,28 +57,42 @@ class CustomDialog:
 
 
 class InputDialog:
-    def __init__(self, master):
+    def __init__(self, master, missing_compound="Test"):
         self.dialog = tk.Toplevel(master)
-        self.dialog_label = tk.Label(self.dialog, text="Enter mass ")
+        # master.mol_mass = tk.StringVar()
+        self.mol_mass = master.mol_mass
+        self.dialog_label = tk.Label(self.dialog, text=f"Enter the molecular mass for {missing_compound}:")
         self.dialog_label.pack(padx=(10, 15), pady=15, side=tk.TOP)
-        self.input_box = tk.Entry(self.dialog)
+        self.input_box = tk.Entry(self.dialog, textvariable=self.mol_mass)
         self.input_box.pack(padx=5, pady=5, side=tk.TOP)
-        self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.dialog.withdraw())
+        self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.save_and_close())
         self.dialog_button.pack(padx=5, pady=5, side=tk.TOP)
         self.dialog.wm_protocol("WM_DELETE_WINDOW", lambda: master.on_delete_child(self.dialog))
+        self.master = master
+        master.wait_window(self.dialog)
+
+    def save_and_close(self):
+        mol_mass = self.mol_mass.get()
+        if mol_mass and mol_mass.isnumeric() and float(mol_mass) > 0:
+            self.dialog.withdraw()
+        else:
+            self.mol_mass.set("")
 
     def _set_label(self, message):
-        self.dialog_label.configure(text=f"\n{message}\n")
+        self.dialog_label.configure(text=message)
 
-    def bring_to_top(self):
+    def bring_to_top(self, missing_compound):
+        self._set_label(f"Enter the molecular mass for {missing_compound}:")
         self.dialog.attributes('-topmost', 'true')
         self.dialog.deiconify()
+        self.master.wait_window(self.dialog)
 
 
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.menubar = None
+        self.mol_mass = tk.StringVar()
         self.input_box = None
         self.optionsbar = None
         self.selections_machine_text = None
@@ -267,8 +281,13 @@ class Application(tk.Frame):
                 df_quantity = self.extra_process_waters(df_quantity)
 
                 return df_area, df_quantity, df_rt
-            except Exception as e:
-                return 'wrong parameters', str(e)
+            except KeyError as ke:
+                print('wait...')
+                self.get_mol_mass(str(ke))
+                print(self.mol_mass.get())
+                print('done')
+                #return 'wrong parameters', str(ke)
+                self.process_files()
 
     def get_file_type(self):
         file_type = 'TXT'
@@ -532,14 +551,14 @@ class Application(tk.Frame):
     def help(self, _):
         self.show_help()
 
-    def show_compounds(self):
+    def get_mol_mass(self, missing_compound):
         if self.input_box:
             try:
-                self.input_box.bring_to_top()
+                self.input_box.bring_to_top(missing_compound)
             except Exception:
                 self.input_box = None
         if not self.input_box:
-            self.input_box = InputDialog(self)
+            self.input_box = InputDialog(self, missing_compound)
 
     def show_help(self):
         if not self.config_window:
@@ -597,7 +616,7 @@ class Application(tk.Frame):
         filemenu.add_command(label=f"Exit            Esc", command=self.exit, activebackground="palegreen")
         self.menubar.add_cascade(label="File", menu=filemenu)
 
-        self.menubar.add_command(label="Compounds", command=self.show_compounds, activebackground="#def5d6")
+        # self.menubar.add_command(label="Compounds", command=self.get_mol_mass(), activebackground="#def5d6")
 
         self.add_options_bar()
         self.status_message.configure(text=f"Last used folder: {self.config['cwd']}", fg="#666")
