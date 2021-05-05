@@ -24,7 +24,7 @@ class CustomDialog:
         self.dialog = tk.Toplevel(master)
         self.dialog_image = tk.Label(self.dialog)
         self.dialog_image.pack(padx=(10, 10), pady=2, side=tk.LEFT)
-        self.dialog_label = tk.Label(self.dialog, text="Grrr! Something's wrong.")
+        self.dialog_label = tk.Label(self.dialog, text="")
         self.dialog_label.pack(padx=(10, 15), pady=15, side=tk.LEFT)
         self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.dialog.withdraw())
         self.dialog_button.pack(padx=5, pady=5, side=tk.BOTTOM)
@@ -56,43 +56,12 @@ class CustomDialog:
         self.dialog.deiconify()
 
 
-class InputDialog:
-    def __init__(self, master, missing_compound="Test"):
-        self.dialog = tk.Toplevel(master)
-        # master.mol_mass = tk.StringVar()
-        self.mol_mass = master.mol_mass
-        self.dialog_label = tk.Label(self.dialog, text=f"Enter the molecular mass for {missing_compound}:")
-        self.dialog_label.pack(padx=(10, 15), pady=15, side=tk.TOP)
-        self.input_box = tk.Entry(self.dialog, textvariable=self.mol_mass)
-        self.input_box.pack(padx=5, pady=5, side=tk.TOP)
-        self.dialog_button = tk.Button(self.dialog, text="OK", command=lambda: self.save_and_close())
-        self.dialog_button.pack(padx=5, pady=5, side=tk.TOP)
-        self.dialog.wm_protocol("WM_DELETE_WINDOW", lambda: master.on_delete_child(self.dialog))
-        self.master = master
-        master.wait_window(self.dialog)
-
-    def save_and_close(self):
-        mol_mass = self.mol_mass.get()
-        if mol_mass and mol_mass.isnumeric() and float(mol_mass) > 0:
-            self.dialog.withdraw()
-        else:
-            self.mol_mass.set("")
-
-    def _set_label(self, message):
-        self.dialog_label.configure(text=message)
-
-    def bring_to_top(self, missing_compound):
-        self._set_label(f"Enter the molecular mass for {missing_compound}:")
-        self.dialog.attributes('-topmost', 'true')
-        self.dialog.deiconify()
-        self.master.wait_window(self.dialog)
-
-
 class Application(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         self.menubar = None
-        self.mol_mass = tk.StringVar()
+        self.missing_compound = tk.StringVar()
+        self.missing_compound_mass = tk.StringVar()
         self.input_box = None
         self.optionsbar = None
         self.selections_machine_text = None
@@ -111,7 +80,7 @@ class Application(tk.Frame):
         self.df = pd.DataFrame()
         self.config_window = False
         self.messagebox = None
-        self.mol_weights = self.load_compounds()
+        self.compounds = self.load_compounds()
         self.cwd_lf = None
         self.dir_lf = None
         self.change_color()
@@ -217,7 +186,7 @@ class Application(tk.Frame):
                 fill_value = df['analyte_name'][analytes[analytes_index]].split(':')[1].strip()
         return df
 
-    def extra_process_bruker(self, df_quantity):
+    def double_quantity_bruker(self, df_quantity):
         if self.double_conc.get():
             for col in df_quantity.columns.to_list():
                 df_quantity[col] = df_quantity[col].apply(double_it)
@@ -239,15 +208,19 @@ class Application(tk.Frame):
             df_quantity = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name',
                                          values='quantity_units')
             df_rt = df.pivot_table(index=['data_set', 'sample_type'], columns='analyte_name', values='rt_min')
-            df_quantity = self.extra_process_bruker(df_quantity)
+            df_quantity = self.double_quantity_bruker(df_quantity)
             return df_area, df_quantity, df_rt
 
-    def extra_process_waters(self, df_quantity):
-        if self.unit_conc.get():
-            for col in df_quantity.columns.to_list():
-                mol_weight = self.mol_weights[col.lower()]
-                df_quantity[col] = df_quantity[col].apply(unit_conc, args=(mol_weight,))
-        return df_quantity
+    def unit_conversion_waters(self, df_quantity):
+        try:
+            if self.unit_conc.get():
+                for col in df_quantity.columns.to_list():
+                    mol_weight = self.compounds[col.lower()]
+                    df_quantity[col] = df_quantity[col].apply(unit_conc, args=(mol_weight,))
+            return df_quantity, None
+        except KeyError as ke:
+            missing_compound = str(ke).strip("'")
+            return "missing compound", missing_compound
 
     def process_waters(self, df):
         analysis_type = self.analysis_type.get()
@@ -278,16 +251,13 @@ class Application(tk.Frame):
                 df_quantity = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='conc')
                 df_rt = df.pivot_table(index=['sample_text', 'type'], columns='analyte_name', values='rt')
 
-                df_quantity = self.extra_process_waters(df_quantity)
+                result = self.unit_conversion_waters(df_quantity)
+                if isinstance(result[0], str):
+                    return "missing compound", result[1]
 
                 return df_area, df_quantity, df_rt
-            except KeyError as ke:
-                print('wait...')
-                self.get_mol_mass(str(ke))
-                print(self.mol_mass.get())
-                print('done')
-                #return 'wrong parameters', str(ke)
-                self.process_files()
+            except Exception as e:
+                return "wrong parameters", str(e)
 
     def get_file_type(self):
         file_type = 'TXT'
@@ -342,7 +312,8 @@ class Application(tk.Frame):
                         df_area, df_quantity, df_rt = result[0], result[1], result[2]
                     else:
                         result = self.process_waters(df)
-                        if isinstance(result[0], str) and result[0] == 'wrong parameters':
+                        if isinstance(result[0], str) and (result[0] == 'missing compound' or
+                                                           result[0] == 'wrong parameters'):
                             return result
                         df_area, df_quantity, df_rt = result[0], result[1], result[2]
 
@@ -389,9 +360,11 @@ class Application(tk.Frame):
         elif isinstance(result[0], str) and result[0] == 'wrong parameters':
             message1 = f"Please check your selections / file structure."
             message2 = f"\nLook for missing columns, if you have modified the exported file."
-            message3 = f"\n\nOr a missing molecular mass value in the Flip L2W software.\n{ result[1] }"
             self.status_message.configure(text=message1, fg="#ff0000", bg="#ddd")
-            self.show_messagebox(message1 + message2 + message3, message_type="error")
+            self.show_messagebox(message1 + message2, message_type="error")
+        elif isinstance(result[0], str) and result[0] == 'missing compound':
+            self.status_message.configure(text=f"Missing compound: {result[1]}", fg="#ff0000", bg="#ddd")
+            self.get_mol_mass(result[1])
 
     def select_cwd(self):
         old = self.config["cwd"]
@@ -452,6 +425,53 @@ class Application(tk.Frame):
         f.pack_propagate(0)
         self.selections_analysis_text = tk.Label(f, bg="#eee", fg="#222", font=("Arial", 10), anchor="w")
         self.selections_analysis_text.pack(side=tk.TOP, padx=2, pady=1, fill=tk.BOTH, expand=1)
+
+    def add_data_entry_controls(self):
+        self.data_frame = tk.LabelFrame(self.master, text="", relief=tk.FLAT)
+        self.data_frame.pack(padx=2, pady=2, side=tk.TOP)
+
+        self.data_lf = tk.LabelFrame(self.data_frame, text="", fg='#444', bg="#ccc", relief=tk.FLAT)
+
+        label_lf = tk.LabelFrame(self.data_lf, text="Enter molecular mass for the compound",
+                                 fg='#444', bg="#ccc", relief=tk.FLAT)
+        label_lf.pack(padx=2, pady=2, side=tk.LEFT)
+        self.data_label = tk.Text(label_lf, height=1, borderwidth=0)
+        self.data_label.pack(padx=2, pady=2, side=tk.LEFT)
+
+        input_lf = tk.LabelFrame(self.data_lf, text="Mass", fg='#444', bg="#ccc", relief=tk.FLAT)
+        input_lf.pack(padx=2, pady=2, side=tk.LEFT)
+        input_box = tk.Entry(input_lf, textvariable=self.missing_compound_mass, width=6)
+        input_box.pack(padx=2, pady=2, side=tk.LEFT)
+
+        button = tk.Button(self.data_lf, text="Save", command=self.validate_mass)
+        button.pack(padx=2, pady=2, side=tk.LEFT)
+
+    def hide_data_lf(self):
+        self.data_lf.pack_forget()
+
+    def show_data_lf(self, missing_compound):
+        self.missing_compound.set(missing_compound)
+        self.data_label.delete("1.0", tk.END)
+        self.missing_compound_mass.set("")
+        self.data_label.insert(1.0, missing_compound)
+        self.process_button.configure(state=tk.DISABLED)
+        self.data_lf.pack(side=tk.TOP, padx=2, pady=2)
+
+    def validate_mass(self):
+        missing_compound_mass = self.missing_compound_mass.get()
+        if missing_compound_mass and missing_compound_mass.isnumeric() and float(missing_compound_mass) > 0:
+            self.hide_data_lf()
+            self.add_compound()
+            self.long_to_wide()
+            self.process_button.configure(state=tk.NORMAL)
+        else:
+            self.missing_compound_mass.set("")
+
+    def add_compound(self):
+        self.compounds[self.missing_compound.get()] = float(self.missing_compound_mass.get())
+        with open(COMPOUNDS_FILE, "w+") as f:
+            json.dump(self.compounds, f, indent=4)
+        return
 
     def add_process_controls(self):
         status_bar = tk.LabelFrame(self.master, text="", padx=2, pady=2, relief=tk.FLAT, bg="#b3cccc")
@@ -540,6 +560,7 @@ class Application(tk.Frame):
         self._add_unit_conc_selector()
         self.add_process_controls()
         self.add_feedback_controls()
+        self.add_data_entry_controls()
 
     def exit(self):
         self.master.destroy()
@@ -552,13 +573,7 @@ class Application(tk.Frame):
         self.show_help()
 
     def get_mol_mass(self, missing_compound):
-        if self.input_box:
-            try:
-                self.input_box.bring_to_top(missing_compound)
-            except Exception:
-                self.input_box = None
-        if not self.input_box:
-            self.input_box = InputDialog(self, missing_compound)
+        self.show_data_lf(missing_compound)
 
     def show_help(self):
         if not self.config_window:
@@ -584,7 +599,7 @@ class Application(tk.Frame):
 
             ctext = scrolledtext.ScrolledText(self.config_window, height=20, font=('Courier', 10))
             ctext.pack(padx=3, pady=3, fill=tk.BOTH)
-            mol_list = [f"{k: <50}- {self.mol_weights[k]}\n" for k in self.mol_weights.keys()]
+            mol_list = [f"{k: <50}- {self.compounds[k]}\n" for k in self.compounds.keys()]
             help_text = "".join(mol_list)
             ctext.insert("end", help_text)
         else:
@@ -616,8 +631,6 @@ class Application(tk.Frame):
         filemenu.add_command(label=f"Exit            Esc", command=self.exit, activebackground="palegreen")
         self.menubar.add_cascade(label="File", menu=filemenu)
 
-        # self.menubar.add_command(label="Compounds", command=self.get_mol_mass(), activebackground="#def5d6")
-
         self.add_options_bar()
         self.status_message.configure(text=f"Last used folder: {self.config['cwd']}", fg="#666")
 
@@ -630,6 +643,6 @@ root = tk.Tk()
 img = PhotoImage(file='icon.ico')
 root.tk.call('wm', 'iconphoto', root._w, img)
 app = Application(root)
-root.geometry("900x600")
+root.geometry("900x680")
 root.configure(background='#b3cccc')
 root.mainloop()
