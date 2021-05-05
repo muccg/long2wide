@@ -62,7 +62,7 @@ class Application(tk.Frame):
         tk.Frame.__init__(self, master)
         self.selected_cwd = False
         self.pack(fill='both', padx=2, pady=2)
-        self.master.title('ANPC - Flippy')
+        self.master.title('ANPC - Flip L2W')
         self.machine_type = tk.StringVar(value="Bruker")
         self.analysis_type = tk.StringVar(value="Amino Acids")
         self.load_config()
@@ -332,7 +332,7 @@ class Application(tk.Frame):
         elif isinstance(result[0], str) and result[0] == 'wrong parameters':
             message1 = f"Please check your selections / file structure."
             message2 = f"\nLook for missing columns, if you have modified the exported file."
-            message3 = f"\n\nOr a missing molecular mass value in the FlipPy software.\n{ result[1] }"
+            message3 = f"\n\nOr a missing molecular mass value in the Flip L2W software.\n{ result[1] }"
             self.status_message.configure(text=message1, fg="#ff0000", bg="#ddd")
             self.show_messagebox(message1 + message2 + message3, message_type="error")
 
@@ -494,7 +494,7 @@ class Application(tk.Frame):
             self.config_window.wm_title("Help")
             self.config_window.wm_protocol("WM_DELETE_WINDOW", lambda: self.on_delete_child(self.config_window))
 
-            help_text = f"FlipPy Instructions:\n"
+            help_text = f"Flip L2W Instructions:\n"
             tk.Label(self.config_window, text=help_text, bg="#ddd", font=("Arial", 12), anchor="w").pack(fill=tk.X)
 
             help_text = f"\nPlease copy your files to an empty folder and select that folder."
@@ -520,7 +520,7 @@ class Application(tk.Frame):
         self.exit()
 
     def add_options_bar(self):
-        tk.Label(self, text="FlipPy", bg="#b3cccc", font=("Arial", 16)).pack(side=tk.TOP, fill=tk.X)
+        tk.Label(self, text="Flip L2W", bg="#b3cccc", font=("Arial", 16)).pack(side=tk.TOP, fill=tk.X)
         tk.Label(self, text="(Cast Long to Wide)", bg="#b3cccc", font=("Arial", 11)).pack(side=tk.TOP, fill=tk.X)
 
         self.optionsbar = tk.Frame(self, bd=1, relief=tk.FLAT, bg="#ddd")
