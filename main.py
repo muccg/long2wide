@@ -9,6 +9,9 @@ from tkinter import scrolledtext
 from utils import *
 from models import DataFile
 from PIL.ImageTk import PhotoImage
+from webbrowser import open as url_open
+
+SEARCH_URL = "https://google.com.au/search?q=molar mass of "
 
 IMPLEMENTED = [
     ('Bruker', 'Amino Acids'),
@@ -572,8 +575,12 @@ class Application(tk.Frame):
     def help(self, _):
         self.show_help()
 
+    def get_search_url(self, missing_compound):
+        return SEARCH_URL + missing_compound
+
     def get_mol_mass(self, missing_compound):
         self.show_data_lf(missing_compound)
+        url_open(self.get_search_url(missing_compound))
 
     def show_help(self):
         if not self.config_window:
