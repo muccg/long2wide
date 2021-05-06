@@ -580,7 +580,7 @@ class Application(tk.Frame):
 
     def get_mol_mass(self, missing_compound):
         self.show_data_lf(missing_compound)
-        url_open(self.get_search_url(missing_compound))
+        url_open(self.get_search_url(missing_compound.replace('_', ' ')))
 
     def show_help(self):
         if not self.config_window:
