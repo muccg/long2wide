@@ -258,9 +258,33 @@ class Application(tk.Frame):
                 if isinstance(result[0], str):
                     return "missing compound", result[1]
 
-                return df_area, df_quantity, df_rt
+                df_grouped_conc = self.group_conc_waters(df)
+
+                return df_area, df_quantity, df_rt, df_grouped_conc
             except Exception as e:
                 return "wrong parameters", str(e)
+
+    def group_conc_waters(self, df):
+        df1 = df.loc[df["sample_text"] != "Double Blank"]
+        df1 = df1.sort_values(by=['analyte_name', 'sample_text'], ignore_index=True)
+        an = None
+        st = None
+        suffix = 0
+        for index, row in df1.iterrows():
+            if row['analyte_name'] != an:
+                suffix = 0
+                an = row['analyte_name']
+                st = None
+            if row['sample_text'] != st:
+                st = row['sample_text']
+                suffix = 0
+            else:
+                suffix += 1
+
+            if suffix > 0:
+                df1.at[index, 'sample_text'] = row['sample_text'] + str(suffix)
+        df_out = df1.pivot_table(index=['sample_text'], columns='analyte_name', values='conc')
+        return df_out
 
     def get_file_type(self):
         file_type = 'TXT'
@@ -296,6 +320,7 @@ class Application(tk.Frame):
         sheet_name1 = 'Area'
         sheet_name2 = 'Conc'
         sheet_name3 = 'RT'
+        sheet_name4 = 'Conc Grouped'
         if machine_type == 'Bruker':
             sheet_name1 = 'Area of PI'
             sheet_name2 = 'Quantity Units'
@@ -307,6 +332,7 @@ class Application(tk.Frame):
             data_file = DataFile()
             for file in files:
                 if '_flipped' not in file:
+                    df_grouped = None
                     df = data_file.read(file, file_type)
                     if machine_type == 'Bruker':
                         result = self.process_bruker(df)
@@ -318,7 +344,7 @@ class Application(tk.Frame):
                         if isinstance(result[0], str) and (result[0] == 'missing compound' or
                                                            result[0] == 'wrong parameters'):
                             return result
-                        df_area, df_quantity, df_rt = result[0], result[1], result[2]
+                        df_area, df_quantity, df_rt, df_grouped = result[0], result[1], result[2], result[3]
 
                     out_filename = f"{file}_{timestamp}_flipped.xlsx"
                     output_path = os.path.join(current_dir, out_filename)
@@ -326,6 +352,8 @@ class Application(tk.Frame):
                         df_area.to_excel(writer, sheet_name1)
                         df_quantity.to_excel(writer, sheet_name2)
                         df_rt.to_excel(writer, sheet_name3)
+                        if len(result) == 4:
+                            df_grouped.to_excel(writer, sheet_name4)
                         writer.save()
         else:
             return 'not found'
