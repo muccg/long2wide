@@ -86,6 +86,9 @@ class Application(tk.Frame):
         self.compounds = self.load_compounds()
         self.cwd_lf = None
         self.dir_lf = None
+        self.data_lf = None
+        self.data_frame = None
+        self.data_label = None
         self.change_color()
 
     def load_compounds(self):
@@ -178,15 +181,15 @@ class Application(tk.Frame):
         self.set_processing_options()
 
     def fill_analyte_name(self, df):
-        analytes = df[df['analyte_name'].apply(lambda x: str(x).startswith('Compound'))].index.tolist()
+        analytes = df.loc[df['analyte_name'].str.startswith('Compound'), ['analyte_name']]['analyte_name'].tolist()
         analytes_index = 0
-        fill_value = df['analyte_name'][analytes[analytes_index]].split(':')[1].strip()
+        fill_value = analytes[analytes_index].split(':')[1].strip()
         for i in range(2, len(df.index)):
             if not str(df['analyte_name'][i]).startswith('Compound'):
                 df.at[i, 'analyte_name'] = fill_value
             else:
                 analytes_index += 1
-                fill_value = df['analyte_name'][analytes[analytes_index]].split(':')[1].strip()
+                fill_value = analytes[analytes_index].split(':')[1].strip()
         return df
 
     def double_quantity_bruker(self, df_quantity):
@@ -610,6 +613,9 @@ class Application(tk.Frame):
         self.show_data_lf(missing_compound)
         url_open(self.get_search_url(missing_compound.replace('_', ' ')))
 
+    def raise_above_all(self, window):
+        window.lift()
+
     def show_help(self):
         if not self.config_window:
             self.config_window = tk.Toplevel(self)
@@ -638,7 +644,7 @@ class Application(tk.Frame):
             help_text = "".join(mol_list)
             ctext.insert("end", help_text)
         else:
-            tk.raise_above_all(self.config_window)
+            self.raise_above_all(self.config_window)
 
     def close(self, _):
         self.exit()
