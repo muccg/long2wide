@@ -17,6 +17,7 @@ IMPLEMENTED = [
     ('Bruker', 'Amino Acids'),
     ('Waters', 'Tryptophan'),
     ('Waters', 'Bile Acids'),
+    ('WConversion', 'Conversion'),
 ]
 
 COMPOUNDS_FILE = "compounds.json"
@@ -128,7 +129,24 @@ class Application(tk.Frame):
             if w['text'] in self.sciex_analysis_types:
                 w.configure(state=tk.NORMAL)
 
+    def show_conversion_analysis_types(self):
+        self.analysis_lf.configure(text="Conversion")
+        self.disable_analysis_types()
+        for w in self.analysis_lf.winfo_children():
+            if w['text'] in self.wconversion_analysis_types:
+                w.configure(state=tk.NORMAL)
+
     def toggle_unit_conc(self, enable):
+        if enable:
+            self.unit_conc_lf.configure(text="Tryptophan")
+            for w in self.unit_conc_lf.winfo_children():
+                w.configure(state=tk.NORMAL)
+        else:
+            self.unit_conc_lf.configure(text=" ")
+            for w in self.unit_conc_lf.winfo_children():
+                w.configure(state=tk.DISABLED)
+
+    def toggle_unit_conc_micro(self, enable):
         if enable:
             self.unit_conc_lf.configure(text="Tryptophan")
             for w in self.unit_conc_lf.winfo_children():
@@ -156,6 +174,9 @@ class Application(tk.Frame):
         elif analysis_type == "Amino Acids":
             self.toggle_double_conc(True)
             self.toggle_unit_conc(False)
+        elif analysis_type == "Conversion":
+            self.toggle_double_conc(False)
+            self.toggle_unit_conc(True)
         else:
             self.toggle_double_conc(False)
             self.toggle_unit_conc(False)
@@ -169,6 +190,8 @@ class Application(tk.Frame):
             self.show_sciex_analysis_types()
         if machine == 'Bruker':
             self.show_bruker_analysis_types()
+        if machine == 'WConversion':
+            self.show_conversion_analysis_types()
         analysis_type = self.get_analysis_type()
         message = f"Folder: {self.get_current_dir()}"
         self.selections_folder_text.configure(text=message)
@@ -221,12 +244,24 @@ class Application(tk.Frame):
         try:
             if self.unit_conc.get():
                 for col in df_quantity.columns.to_list():
-                    mol_weight = self.compounds[col.lower()]
-                    df_quantity[col] = df_quantity[col].apply(unit_conc, args=(mol_weight,))
+                    if col != "Sample ID":
+                        mol_weight = self.compounds[col.lower()]
+                        df_quantity[col] = df_quantity[col].apply(unit_conc, args=(mol_weight,))
+            if self.unit_conc_micro.get():
+                for col in df_quantity.columns.to_list():
+                    if col != "Sample ID":
+                        mol_weight = self.compounds[col.lower()]
+                        df_quantity[col] = df_quantity[col].apply(unit_conc_micro, args=(mol_weight,))
             return df_quantity, None
         except KeyError as ke:
             missing_compound = str(ke).strip("'")
             return "missing compound", missing_compound
+
+    def process_conversion(self, df_quantity):
+        result = self.unit_conversion_waters(df_quantity)
+        if isinstance(result[0], str):
+            return "missing compound", result[1]
+        return result
 
     def process_waters(self, df):
         analysis_type = self.analysis_type.get()
@@ -291,7 +326,10 @@ class Application(tk.Frame):
 
     def get_file_type(self):
         file_type = 'TXT'
-        if self.machine_type.get() == 'Bruker':
+        machine_type = self.machine_type.get()
+        if machine_type == 'Bruker':
+            file_type = 'xlsx'
+        if machine_type == 'WConversion':
             file_type = 'xlsx'
         return file_type
 
@@ -342,6 +380,17 @@ class Application(tk.Frame):
                         if isinstance(result[0], str) and result[0] == 'wrong parameters':
                             return result
                         df_area, df_quantity, df_rt = result[0], result[1], result[2]
+                    elif machine_type == 'WConversion':
+                        result = self.process_conversion(df)
+                        if isinstance(result[0], str) and (result[0] == 'missing compound' or
+                                                           result[0] == 'wrong parameters'):
+                            return result
+                        out_filename = f"{file}_{timestamp}_converted.xlsx"
+                        output_path = os.path.join(current_dir, out_filename)
+                        with ExcelWriter(output_path) as writer:
+                            result[0].to_excel(writer, "converted")
+                            writer.save()
+                        return 'completed'
                     else:
                         result = self.process_waters(df)
                         if isinstance(result[0], str) and (result[0] == 'missing compound' or
@@ -511,7 +560,7 @@ class Application(tk.Frame):
         status_bar = tk.LabelFrame(self.master, text="", padx=2, pady=2, relief=tk.FLAT, bg="#b3cccc")
         status_bar.pack(side=tk.BOTTOM, padx=0, pady=0, fill=tk.X)
 
-        self.process_button = tk.Button(status_bar, text="Flip", activebackground='palegreen', width=20,
+        self.process_button = tk.Button(status_bar, text="Go", activebackground='palegreen', width=20,
                                         command=self.long_to_wide, state=tk.DISABLED, font=("Arial", 12))
         self.process_button.pack(side=tk.TOP, padx=2, pady=(0, 20))
 
@@ -527,7 +576,8 @@ class Application(tk.Frame):
         help_text += f"Files should have the columns:\n"
         help_text += f"Bruker (xlsx): {BRUKER_VARIABLES}\n"
         help_text += f"Waters (TXT) : {WATERS_HELP_VARIABLES} (analyte names appear on " + \
-                     f"separate lines, eg. Compound: tryptophan){' '*32}"
+                     f"separate lines, eg. Compound: tryptophan){' '*32}\n"
+        help_text += f"For unit conversion, Waters flipped/wide file should be in xlsx format.\n"
 
         help_message = tk.Label(help_lf, bg="#ccc", fg="#222", font=("Arial", 10), justify=tk.LEFT, text=help_text)
         help_message.pack(side=tk.TOP, padx=10, pady=0)
@@ -539,6 +589,7 @@ class Application(tk.Frame):
             ("Bruker", "Bruker"),
             ("Waters", "Waters"),
             ("Sciex", "Sciex"),
+            ("WConversion", "WConversion"),
         ]                
         for name, code in machines:
             tk.Radiobutton(self.machine_lf, text=name, variable=self.machine_type, bd=0, command=self.machine_change,
@@ -562,7 +613,11 @@ class Application(tk.Frame):
             "Paracetamol",
             "SCFAs",
         ]
-        analysis_types = self.bruker_analysis_types + self.waters_analysis_types + self.sciex_analysis_types
+        self.wconversion_analysis_types = [
+            "Conversion",
+        ]
+        analysis_types = self.bruker_analysis_types + self.waters_analysis_types + self.sciex_analysis_types + \
+            self.wconversion_analysis_types
         for name in analysis_types:
             tk.Radiobutton(self.analysis_lf, text=name, variable=self.analysis_type, bd=0,
                            command=self.set_selections_text,
@@ -576,12 +631,18 @@ class Application(tk.Frame):
         tk.Checkbutton(self.double_conc_lf, text="Double Qty.", state=tk.DISABLED, variable=self.double_conc,
                        bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
 
-    def _add_unit_conc_selector(self):
+    def _add_unit_conc_selectors(self):
         self.unit_conc_lf = tk.LabelFrame(self.cwd_lf, text=" ", padx=2, pady=2, relief=tk.FLAT, bg="#ccc")
+
         self.unit_conc_lf.pack(side=tk.LEFT, padx=8, pady=2)
         self.unit_conc = tk.IntVar(value=1)
-        tk.Checkbutton(self.unit_conc_lf, text="Conc. Unit (ng/mL to uM)", state=tk.DISABLED, variable=self.unit_conc,
-                       bg="#ddd", activebackground="palegreen").pack(side=tk.LEFT, padx=2, pady=2)
+        tk.Checkbutton(self.unit_conc_lf, text="Conc. Unit (ng/mL to mMol)", state=tk.DISABLED,
+                       variable=self.unit_conc,
+                       bg="#ddd", activebackground="palegreen").pack(side=tk.TOP, padx=2, pady=2)
+        self.unit_conc_micro = tk.IntVar(value=1)
+        tk.Checkbutton(self.unit_conc_lf, text="Conc. Unit (ng/mL to uMol)", state=tk.DISABLED,
+                       variable=self.unit_conc_micro,
+                       bg="#ddd", activebackground="palegreen").pack(side=tk.TOP, padx=2, pady=2)
 
     def add_controls(self):
         self.dir_lf = tk.LabelFrame(self.cwd_lf, text='Select', padx=2, pady=2, relief=tk.FLAT, bg="#ccc", fg="red")
@@ -591,7 +652,7 @@ class Application(tk.Frame):
         self._add_machine_selector()
         self._add_analysis_type()
         self._add_double_conc_selector()
-        self._add_unit_conc_selector()
+        self._add_unit_conc_selectors()
         self.add_process_controls()
         self.add_feedback_controls()
         self.add_data_entry_controls()
