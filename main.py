@@ -741,10 +741,15 @@ class Application(tk.Frame):
         self.select_cwd()
 
 
-root = tk.Tk()
-img = PhotoImage(file='icon.ico')
-root.tk.call('wm', 'iconphoto', root._w, img)
-app = Application(root)
-root.geometry("900x680")
-root.configure(background='#b3cccc')
-root.mainloop()
+def main():
+    root = tk.Tk()
+    img = PhotoImage(file='icon.ico')
+    root.tk.call('wm', 'iconphoto', root._w, img)
+    app = Application(root)
+    root.geometry("900x680")
+    root.configure(background='#b3cccc')
+    root.mainloop()
+
+
+if __name__=="__main__":
+    main()
